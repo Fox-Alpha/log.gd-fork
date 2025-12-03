@@ -24,26 +24,14 @@
 extends Object
 class_name Log
 
-# helpers ####################################
-
-static func assoc(opts: Dictionary, key: String, val: Variant) -> Dictionary:
-	var _opts: Dictionary = opts.duplicate(true)
-	_opts[key] = val
-	return _opts
-
-# settings helpers ####################################
-
-static func initialize_setting(key: String, default_value: Variant, type: int, hint: int = PROPERTY_HINT_NONE, hint_string: String = "") -> void:
-	if not ProjectSettings.has_setting(key):
-		ProjectSettings.set(key, default_value)
-	ProjectSettings.set_initial_value(key, default_value)
-	ProjectSettings.add_property_info({name=key, type=type, hint=hint, hint_string=hint_string})
-
 # settings keys and default ####################################
-
-const KEY_PREFIX: String = "log_gd/config"
+#region vars
 static var is_config_setup: bool = false
+static var config: Dictionary = {}
+#endregion
 
+#region constants
+const KEY_PREFIX: String = "log_gd/config"
 # TODO drop this key
 const KEY_COLOR_THEME_DICT: String = "log_color_theme_dict"
 const KEY_COLOR_THEME: String = "log_color_theme"
@@ -60,21 +48,16 @@ const KEY_SHOW_LOG_LEVEL_SELECTOR: String = "%s/show_log_level_selector" % KEY_P
 const KEY_SHOW_TIMESTAMPS: String = "%s/show_timestamps" % KEY_PREFIX
 const KEY_TIMESTAMP_TYPE: String = "%s/timestamp_type" % KEY_PREFIX
 const KEY_HUMAN_READABLE_TIMESTAMP_FORMAT: String = "%s/human_readable_timestamp_format" % KEY_PREFIX
+## Add showing optional MULTIPLAYER_UNIQUE_ID
+const KEY_SHOW_MULTIPLAYER_UNIQUE_ID: String = "%s/show_multiplayer_unique_id" % KEY_PREFIX
+const KEY_SHOW_PROCESS_UNIQUE_ID: String = "%s/show_process_id" % KEY_PREFIX
 
-enum Levels {
-		DEBUG,
-		INFO,
-		WARN,
-		ERROR
-	}
-
-enum TimestampTypes {
-		UNIX,
-		TICKS_MSEC,
-		TICKS_USEC,
-		HUMAN_12HR,
-		HUMAN_24HR
-	}
+const LOG_PRE_NORMAL = "["
+const LOG_SUFF_NORMAL = "]"
+const LOG_PRE_TEST = "{"
+const LOG_SUFF_TEST = "}"
+const LOG_PRE_ADDON = "<"
+const LOG_SUFF_ADDON = ">"
 
 const CONFIG_DEFAULTS := {
 		KEY_COLOR_THEME_RESOURCE_PATH: "res://addons/log/color_theme_dark.tres",
@@ -91,6 +74,39 @@ const CONFIG_DEFAULTS := {
 		KEY_TIMESTAMP_TYPE: TimestampTypes.HUMAN_12HR,
 		KEY_HUMAN_READABLE_TIMESTAMP_FORMAT: "{hour}:{minute}:{second}",
 	}
+#endregion
+
+#region enum
+enum Levels {
+		DEBUG,
+		INFO,
+		WARN,
+		ERROR
+	}
+
+enum TimestampTypes {
+		UNIX,
+		TICKS_MSEC,
+		TICKS_USEC,
+		HUMAN_12HR,
+		HUMAN_24HR
+	}
+#endregion
+
+# helpers ####################################
+#region helper
+static func assoc(opts: Dictionary, key: String, val: Variant) -> Dictionary:
+	var _opts: Dictionary = opts.duplicate(true)
+	_opts[key] = val
+	return _opts
+
+# settings helpers ####################################
+
+static func initialize_setting(key: String, default_value: Variant, type: int, hint: int = PROPERTY_HINT_NONE, hint_string: String = "") -> void:
+	if not ProjectSettings.has_setting(key):
+		ProjectSettings.set(key, default_value)
+	ProjectSettings.set_initial_value(key, default_value)
+	ProjectSettings.add_property_info({name=key, type=type, hint=hint, hint_string=hint_string})
 
 # settings setup ####################################
 
@@ -131,6 +147,11 @@ static func rebuild_config(opts: Dictionary = {}) -> void:
 		set_colors_termsafe()
 
 	Log.is_config_setup = true
+
+static func is_not_default(v: Variant) -> bool:
+	return not v is String or (v is String and v != "ZZZDEF")
+
+#endregion
 
 # config getters ###################################################################
 
@@ -646,8 +667,6 @@ static func timestamp() -> String:
 
 ## public print fns ###########################################################################
 
-static func is_not_default(v: Variant) -> bool:
-	return not v is String or (v is String and v != "ZZZDEF")
 
 ## Pretty-print the passed arguments in a single line.
 static func pr(msg: Variant, msg2: Variant = "ZZZDEF", msg3: Variant = "ZZZDEF", msg4: Variant = "ZZZDEF", msg5: Variant = "ZZZDEF", msg6: Variant = "ZZZDEF", msg7: Variant = "ZZZDEF") -> void:
@@ -768,7 +787,7 @@ static func _internal_debug(msg: Variant, msg2: Variant = "ZZZDEF", msg3: Varian
 	print("_internal_debug: ", m)
 	print_rich(m)
 
-
+#region deprecated
 ## DEPRECATED
 static func merge_theme_overwrites(_opts = {}) -> void:
 	pass
@@ -776,3 +795,4 @@ static func merge_theme_overwrites(_opts = {}) -> void:
 ## DEPRECATED
 static func clear_theme_overwrites() -> void:
 	pass
+#endregion
