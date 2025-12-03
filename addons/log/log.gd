@@ -652,16 +652,21 @@ static func to_pretty(msg: Variant, opts: Dictionary = {}) -> String:
 
 static func log_prefix(stack: Array) -> String:
 	if len(stack) > 1:
+		var prefix : String = LOG_PRE_NORMAL
+		var suffix : String = LOG_SUFF_NORMAL
 		var call_site: Dictionary = stack[1]
 		var call_site_source: String = call_site.get("source", "")
-		var basename: String = call_site_source.get_file().get_basename()
+		var basename: String = call_site_source.get_file()
 		var line_num: String = str(call_site.get("line", 0))
+		var function: String = str(call_site.get("function", "func_unknown"))
 		if call_site_source.match("*/test/*"):
-			return "{" + basename + ":" + line_num + "}: "
+			prefix = LOG_PRE_TEST
+			suffix = LOG_SUFF_TEST
 		elif call_site_source.match("*/addons/*"):
-			return "<" + basename + ":" + line_num + ">: "
-		else:
-			return "[" + basename + ":" + line_num + "]: "
+			prefix = LOG_PRE_ADDON
+			suffix = LOG_SUFF_ADDON
+		var result : String = "{prefix}{basename}:{line_num}::{function}(){suffix}".format({"prefix": prefix, "basename":basename, "line_num":line_num, "function":function, "suffix":suffix})
+		return result
 	return ""
 
 static func to_printable(msgs: Array, opts: Dictionary = {}) -> String:
