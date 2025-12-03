@@ -385,6 +385,153 @@ static func clear_type_overwrites() -> void:
 #endregion
 
 ## to_pretty ###########################################################################
+#region to_pretty
+#objects
+static func _to_pretty_objects(msg : Variant, opts: Dictionary = {}) -> String:
+	if msg is Object and (msg as Object).has_method("to_pretty"):
+		# using a cast and `call.("blah")` here it's "type safe"
+		return Log.to_pretty((msg as Object).call("to_pretty"), opts)
+	if msg is Object and (msg as Object).has_method("data"):
+		return Log.to_pretty((msg as Object).call("data"), opts)
+	# DEPRECATED
+	if msg is Object and (msg as Object).has_method("to_printable"):
+		return Log.to_pretty((msg as Object).call("to_printable"), opts)
+	else:
+		return Log.color_wrap(msg, opts)
+
+#strings
+static func _to_pretty_strings(msg : Variant, opts: Dictionary = {}) -> String:
+	if msg is String:
+		if msg == "":
+			return '""'
+		if "[color=" in msg and "[/color]" in msg:
+			# passes through strings that might already be colorized?
+			# can't remember this use-case
+			# perhaps should use a regex and unit tests for something more robust
+			return msg
+		return Log.color_wrap(msg, opts)
+	elif msg is StringName:
+		return str(Log.color_wrap("&", opts), '"%s"' % msg)
+	elif msg is NodePath:
+		return str(Log.color_wrap("^", opts), '"%s"' % msg)
+	else:
+		return Log.color_wrap(msg, opts)
+
+#arrays
+static func _to_pretty_arrays(msg : Variant, opts: Dictionary = {}) -> String:
+	if msg is Array or msg is PackedStringArray:
+		var newlines : bool = get_use_newlines()
+		var msg_array: Array = msg
+		if len(msg) > Log.get_max_array_size():
+			pr("[DEBUG]: truncating large array. total:", len(msg))
+			msg_array = msg_array.slice(0, Log.get_max_array_size() - 1)
+			if newlines:
+				msg_array.append("...")
+
+		# shouldn't we be incrementing index_level here?
+		var tmp: String = Log.color_wrap("[ ", opts)
+		opts["newline_depth"] += 1
+		var last: int = len(msg) - 1
+		for i: int in range(len(msg)):
+			if newlines and last > 1:
+				tmp += Log.color_wrap("\n\t", opts)
+			tmp += Log.to_pretty(msg[i],
+				# duplicate here to prevent indenting-per-msg
+				# e.g. when printing an array of dictionaries
+				opts.duplicate(true))
+			if i != last:
+				tmp += Log.color_wrap(", ", opts)
+		opts["newline_depth"] -= 1
+		tmp += Log.color_wrap(" ]", opts)
+		return tmp
+	else:
+		return Log.color_wrap(msg, opts)
+
+#dictionary
+static func _to_pretty_dictionary(msg : Variant, opts: Dictionary = {}) -> String:
+	if msg is Dictionary:
+		var newlines : bool = get_use_newlines()
+		var indent_level: int = opts.get("indent_level", 0)
+		var tmp: String = Log.color_wrap("{ ", opts)
+		opts["newline_depth"] += 1
+		var ct: int = len(msg)
+		var last: Variant
+		if len(msg) > 0:
+			last = (msg as Dictionary).keys()[-1]
+		var indent_updated = false
+		for k: Variant in (msg as Dictionary).keys():
+			var val: Variant
+			if k in Log.get_dictionary_skip_keys():
+				val = "..."
+			else:
+				if not indent_updated:
+					indent_updated = true
+					opts["indent_level"] += 1
+				val = Log.to_pretty(msg[k], opts)
+			if newlines and ct > 1:
+				tmp += Log.color_wrap("\n\t", opts) \
+					+ Log.color_wrap(range(indent_level)\
+					.map(func(_i: int) -> String: return "\t")\
+					.reduce(func(a: String, b: Variant) -> String: return str(a, b), ""), opts)
+			var key: String = Log.color_wrap('"%s"' % k, Log.assoc(opts, "typeof", "dict_key"))
+			tmp += "%s%s%s" % [key, Log.color_wrap(": ", opts), val]
+			if last and str(k) != str(last):
+				tmp += Log.color_wrap(", ", opts)
+		opts["newline_depth"] -= 1
+		tmp += Log.color_wrap(" }", opts)
+		opts["indent_level"] -= 1 # ugh! updating the dict in-place
+		return tmp
+	else:
+		return Log.color_wrap(msg, opts)
+
+#colors
+static func _to_pretty_colors(msg : Variant, opts: Dictionary = {}) -> String:
+	if msg is Color:
+		# probably too opinionated, but seeing 4 floats for color is noisey
+		return Log.color_wrap(msg.to_html(false), Log.assoc(opts, "typeof", TYPE_COLOR))
+	else:
+		return Log.color_wrap(msg, opts)
+
+#refcounted
+static func _to_pretty_refcounted(msg : Variant, opts: Dictionary = {}) -> String:
+	if msg is RefCounted:
+		var msg_ref: RefCounted = msg
+		if msg_ref.get_script() != null and msg_ref.get_script().resource_path != "":
+			var path: String = msg_ref.get_script().resource_path
+			return Log.color_wrap(path.get_file(), Log.assoc(opts, "typeof", "class_name"))
+		else:
+			return Log.color_wrap(msg_ref.get_class(), Log.assoc(opts, "typeof", "class_name"))
+	else:
+		return Log.color_wrap(msg, opts)
+
+#packedscene
+static func _to_pretty_packedscene(msg : Variant, opts: Dictionary = {}) -> String:
+	if msg is PackedScene:
+		var msg_ps: PackedScene = msg
+		if msg_ps.resource_path != "":
+			return str(Log.color_wrap("PackedScene:", opts), '%s' % msg_ps.resource_path.get_file())
+		elif msg_ps.get_script() != null and msg_ps.get_script().resource_path != "":
+			var path: String = msg_ps.get_script().resource_path
+			return Log.color_wrap(path.get_file(), Log.assoc(opts, "typeof", "class_name"))
+		else:
+			return Log.color_wrap(msg_ps, opts)
+	else:
+		return Log.color_wrap(msg, opts)
+
+#resorce
+static func _to_pretty_resorce(msg : Variant, opts: Dictionary = {}) -> String:
+	if msg is Resource:
+		var msg_res: Resource = msg
+		if msg_res.get_script() != null and msg_res.get_script().resource_path != "":
+			var path: String = msg_res.get_script().resource_path
+			return Log.color_wrap(path.get_file(), Log.assoc(opts, "typeof", "class_name"))
+		elif msg_res.resource_path != "":
+			var path: String = msg_res.resource_path
+			return str(Log.color_wrap("Resource:", opts), '%s' % path.get_file())
+		else:
+			return Log.color_wrap(msg_res, opts)
+	else:
+		return Log.color_wrap(msg, opts)
 
 ## Returns the passed object as a bb-colorized string.
 ##
@@ -395,6 +542,7 @@ static func clear_type_overwrites() -> void:
 ## Can be useful to feed directly into a RichTextLabel.
 ##
 static func to_pretty(msg: Variant, opts: Dictionary = {}) -> String:
+#region formatnewlines
 	var newlines: bool = opts.get("newlines", Log.get_use_newlines())
 	var newline_depth: int = opts.get("newline_depth", 0)
 	var newline_max_depth: int = opts.get("newline_max_depth", Log.get_newline_max_depth())
@@ -427,95 +575,29 @@ static func to_pretty(msg: Variant, opts: Dictionary = {}) -> String:
 	elif typeof(msg) in type_overwrites:
 		var fn: Callable = type_overwrites.get(typeof(msg))
 		return Log.to_pretty(fn.call(msg), opts)
+#endregion
 
 	# objects
-	if msg is Object and (msg as Object).has_method("to_pretty"):
-		# using a cast and `call.("blah")` here it's "type safe"
-		return Log.to_pretty((msg as Object).call("to_pretty"), opts)
-	if msg is Object and (msg as Object).has_method("data"):
-		return Log.to_pretty((msg as Object).call("data"), opts)
-	# DEPRECATED
-	if msg is Object and (msg as Object).has_method("to_printable"):
-		return Log.to_pretty((msg as Object).call("to_printable"), opts)
+	if msg is Object:
+		return _to_pretty_objects(msg, opts)
 
 	# arrays
-	if msg is Array or msg is PackedStringArray:
-		var msg_array: Array = msg
-		if len(msg) > Log.get_max_array_size():
-			pr("[DEBUG]: truncating large array. total:", len(msg))
-			msg_array = msg_array.slice(0, Log.get_max_array_size() - 1)
-			if newlines:
-				msg_array.append("...")
-
-		# shouldn't we be incrementing index_level here?
-		var tmp: String = Log.color_wrap("[ ", opts)
-		opts["newline_depth"] += 1
-		var last: int = len(msg) - 1
-		for i: int in range(len(msg)):
-			if newlines and last > 1:
-				tmp += Log.color_wrap("\n\t", opts)
-			tmp += Log.to_pretty(msg[i],
-				# duplicate here to prevent indenting-per-msg
-				# e.g. when printing an array of dictionaries
-				opts.duplicate(true))
-			if i != last:
-				tmp += Log.color_wrap(", ", opts)
-		opts["newline_depth"] -= 1
-		tmp += Log.color_wrap(" ]", opts)
-		return tmp
+	elif msg is Array:
+		return _to_pretty_arrays(msg, opts)
 
 	# dictionary
 	elif msg is Dictionary:
-		var tmp: String = Log.color_wrap("{ ", opts)
-		opts["newline_depth"] += 1
-		var ct: int = len(msg)
-		var last: Variant
-		if len(msg) > 0:
-			last = (msg as Dictionary).keys()[-1]
-		var indent_updated = false
-		for k: Variant in (msg as Dictionary).keys():
-			var val: Variant
-			if k in Log.get_dictionary_skip_keys():
-				val = "..."
-			else:
-				if not indent_updated:
-					indent_updated = true
-					opts["indent_level"] += 1
-				val = Log.to_pretty(msg[k], opts)
-			if newlines and ct > 1:
-				tmp += Log.color_wrap("\n\t", opts) \
-					+ Log.color_wrap(range(indent_level)\
-					.map(func(_i: int) -> String: return "\t")\
-					.reduce(func(a: String, b: Variant) -> String: return str(a, b), ""), opts)
-			var key: String = Log.color_wrap('"%s"' % k, Log.assoc(opts, "typeof", "dict_key"))
-			tmp += "%s%s%s" % [key, Log.color_wrap(": ", opts), val]
-			if last and str(k) != str(last):
-				tmp += Log.color_wrap(", ", opts)
-		opts["newline_depth"] -= 1
-		tmp += Log.color_wrap(" }", opts)
-		opts["indent_level"] -= 1 # ugh! updating the dict in-place
-		return tmp
+		return _to_pretty_dictionary(msg, opts)
 
 	# strings
 	elif msg is String:
-		if msg == "":
-			return '""'
-		if "[color=" in msg and "[/color]" in msg:
-			# passes through strings that might already be colorized?
-			# can't remember this use-case
-			# perhaps should use a regex and unit tests for something more robust
-			return msg
-		return Log.color_wrap(msg, opts)
-	elif msg is StringName:
-		return str(Log.color_wrap("&", opts), '"%s"' % msg)
-	elif msg is NodePath:
-		return str(Log.color_wrap("^", opts), '"%s"' % msg)
+		return _to_pretty_strings(msg, opts)
 
+	# colors
 	elif msg is Color:
-		# probably too opinionated, but seeing 4 floats for color is noisey
-		return Log.color_wrap(msg.to_html(false), Log.assoc(opts, "typeof", TYPE_COLOR))
+		return _to_pretty_colors(msg, opts)
 
-	# vectors
+	#region vectors
 	elif msg is Vector2 or msg is Vector2i:
 		return '%s%s%s%s%s' % [
 			Log.color_wrap("(", opts),
@@ -547,42 +629,24 @@ static func to_pretty(msg: Variant, opts: Dictionary = {}) -> String:
 			Log.color_wrap(msg.w, Log.assoc(opts, "typeof", "vector_value")),
 			Log.color_wrap(")", opts),
 			]
-
+	#endregion
 	# packed scene
 	elif msg is PackedScene:
-		var msg_ps: PackedScene = msg
-		if msg_ps.resource_path != "":
-			return str(Log.color_wrap("PackedScene:", opts), '%s' % msg_ps.resource_path.get_file())
-		elif msg_ps.get_script() != null and msg_ps.get_script().resource_path != "":
-			var path: String = msg_ps.get_script().resource_path
-			return Log.color_wrap(path.get_file(), Log.assoc(opts, "typeof", "class_name"))
-		else:
-			return Log.color_wrap(msg_ps, opts)
+		return _to_pretty_packedscene(msg, opts)
 
 	# resource
 	elif msg is Resource:
-		var msg_res: Resource = msg
-		if msg_res.get_script() != null and msg_res.get_script().resource_path != "":
-			var path: String = msg_res.get_script().resource_path
-			return Log.color_wrap(path.get_file(), Log.assoc(opts, "typeof", "class_name"))
-		elif msg_res.resource_path != "":
-			var path: String = msg_res.resource_path
-			return str(Log.color_wrap("Resource:", opts), '%s' % path.get_file())
-		else:
-			return Log.color_wrap(msg_res, opts)
+		return _to_pretty_resorce(msg, opts)
 
 	# refcounted
 	elif msg is RefCounted:
-		var msg_ref: RefCounted = msg
-		if msg_ref.get_script() != null and msg_ref.get_script().resource_path != "":
-			var path: String = msg_ref.get_script().resource_path
-			return Log.color_wrap(path.get_file(), Log.assoc(opts, "typeof", "class_name"))
-		else:
-			return Log.color_wrap(msg_ref.get_class(), Log.assoc(opts, "typeof", "class_name"))
+		return _to_pretty_refcounted(msg, opts)
 
 	# fallback to primitive-type lookup
 	else:
 		return Log.color_wrap(msg, opts)
+
+#endregion
 
 ## to_printable ###########################################################################
 
