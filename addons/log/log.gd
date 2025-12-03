@@ -606,7 +606,6 @@ static func to_pretty(msg: Variant, opts: Dictionary = {}) -> String:
 			Log.color_wrap(msg.y, Log.assoc(opts, "typeof", "vector_value")),
 			Log.color_wrap(")", opts),
 		]
-
 	elif msg is Vector3 or msg is Vector3i:
 		return '%s%s%s%s%s%s%s' % [
 			Log.color_wrap("(", opts),
@@ -830,24 +829,24 @@ static func todo(msg: Variant, msg2: Variant = "ZZZDEF", msg3: Variant = "ZZZDEF
 
 ## Like [code]Log.pr()[/code], but also calls push_error() with the pretty string.
 static func err(msg: Variant, msg2: Variant = "ZZZDEF", msg3: Variant = "ZZZDEF", msg4: Variant = "ZZZDEF", msg5: Variant = "ZZZDEF", msg6: Variant = "ZZZDEF", msg7: Variant = "ZZZDEF") -> void:
-	var msgs: Array = [msg, msg2, msg3, msg4, msg5, msg6, msg7]
-	msgs = msgs.filter(Log.is_not_default)
-	var rich_msgs: Array = msgs.duplicate()
-	rich_msgs.push_front("[color=red][ERR][/color]")
-	print_rich(Log.to_printable(rich_msgs, {stack=get_stack()}))
-	# skip the 'color' features in errors to keep them readable in the debugger
-	var m: String = Log.to_printable(msgs, {stack=get_stack(), disable_colors=true})
-	push_error(m)
+	printerr([msg, msg2, msg3, msg4, msg5, msg6, msg7])
+	pass
 
+## Like [code]Log.pr()[/code], but also calls push_error() with the pretty string.
+static func error(msg: Variant, msg2: Variant = "ZZZDEF", msg3: Variant = "ZZZDEF", msg4: Variant = "ZZZDEF", msg5: Variant = "ZZZDEF", msg6: Variant = "ZZZDEF", msg7: Variant = "ZZZDEF") -> void:
+	printerr([msg, msg2, msg3, msg4, msg5, msg6, msg7])
+	pass
 
 static func blank() -> void:
 	print()
 #endregion
 
-
-## Like [code]Log.pr()[/code], but also calls push_error() with the pretty string.
-static func error(msg: Variant, msg2: Variant = "ZZZDEF", msg3: Variant = "ZZZDEF", msg4: Variant = "ZZZDEF", msg5: Variant = "ZZZDEF", msg6: Variant = "ZZZDEF", msg7: Variant = "ZZZDEF") -> void:
-	var msgs: Array = [msg, msg2, msg3, msg4, msg5, msg6, msg7]
+## combined print func's to reduce redundant code -> SOLID:DRY
+#TODO: Seperate for log(), info(), debug(), warn()
+#Maybe: todo()
+#DONE: err(), error()
+static func _printerr(_msgs : Array = []) -> void:
+	var msgs = _msgs
 	msgs = msgs.filter(Log.is_not_default)
 	var rich_msgs: Array = msgs.duplicate()
 	rich_msgs.push_front("[color=red][ERR][/color]")
