@@ -154,7 +154,7 @@ static func is_not_default(v: Variant) -> bool:
 #endregion
 
 # config getters ###################################################################
-
+#region config getter
 static func get_max_array_size() -> int:
 	return Log.config.get(KEY_MAX_ARRAY_SIZE, CONFIG_DEFAULTS[KEY_MAX_ARRAY_SIZE])
 
@@ -205,9 +205,10 @@ static func get_timestamp_type() -> TimestampTypes:
 static func get_timestamp_format() -> String:
 	return Log.config.get(KEY_HUMAN_READABLE_TIMESTAMP_FORMAT, CONFIG_DEFAULTS[KEY_HUMAN_READABLE_TIMESTAMP_FORMAT])
 
+#endregion
 
 ## config setters ###################################################################
-
+#region config setter
 ## Disable color-wrapping output.
 ##
 ## [br][br]
@@ -272,9 +273,10 @@ static func use_timestamp_type(timestamp_type: Log.TimestampTypes) -> void:
 ## Use the given timestamp format
 static func use_timestamp_format(timestamp_format: String) -> void:
 	Log.config[KEY_HUMAN_READABLE_TIMESTAMP_FORMAT] = timestamp_format
+#endregion
 
 ## set color theme ####################################
-
+#region colors
 ## Use the terminal safe color scheme, which should support colors in most tty-like environments.
 static func set_colors_termsafe() -> void:
 	Log.config[KEY_COLOR_THEME_DICT] = LogColorTheme.COLORS_TERM_SAFE
@@ -348,9 +350,10 @@ static func color_wrap(s: Variant, opts: Dictionary = {}) -> String:
 		var bg_color: String = color_theme.get_bg_color(opts.get("newline_depth", 0)).to_html(false)
 		return "[bgcolor=%s][color=%s]%s[/color][/bgcolor]" % [bg_color, color, s]
 	return "[color=%s]%s[/color]" % [color, s]
+#endregion
 
 ## overwrites ###########################################################################
-
+#region overwrites
 static var type_overwrites: Dictionary = {}
 
 ## Register a single type overwrite.
@@ -379,6 +382,7 @@ static func register_type_overwrites(overwrites: Dictionary) -> void:
 
 static func clear_type_overwrites() -> void:
 	type_overwrites = {}
+#endregion
 
 ## to_pretty ###########################################################################
 
@@ -667,7 +671,7 @@ static func timestamp() -> String:
 
 ## public print fns ###########################################################################
 
-
+#region pr...n()
 ## Pretty-print the passed arguments in a single line.
 static func pr(msg: Variant, msg2: Variant = "ZZZDEF", msg3: Variant = "ZZZDEF", msg4: Variant = "ZZZDEF", msg5: Variant = "ZZZDEF", msg6: Variant = "ZZZDEF", msg7: Variant = "ZZZDEF") -> void:
 	var msgs: Array = [msg, msg2, msg3, msg4, msg5, msg6, msg7]
@@ -695,7 +699,9 @@ static func prnnn(msg: Variant, msg2: Variant = "ZZZDEF", msg3: Variant = "ZZZDE
 	msgs = msgs.filter(Log.is_not_default)
 	var m: String = Log.to_printable(msgs, {stack=get_stack(), newlines=true, newline_max_depth=3})
 	print_rich(m)
+#endregion
 
+#region print to log funcs
 ## Pretty-print the passed arguments in a single line.
 static func log(msg: Variant, msg2: Variant = "ZZZDEF", msg3: Variant = "ZZZDEF", msg4: Variant = "ZZZDEF", msg5: Variant = "ZZZDEF", msg6: Variant = "ZZZDEF", msg7: Variant = "ZZZDEF") -> void:
 	var msgs: Array = [msg, msg2, msg3, msg4, msg5, msg6, msg7]
@@ -764,6 +770,12 @@ static func err(msg: Variant, msg2: Variant = "ZZZDEF", msg3: Variant = "ZZZDEF"
 	var m: String = Log.to_printable(msgs, {stack=get_stack(), disable_colors=true})
 	push_error(m)
 
+
+static func blank() -> void:
+	print()
+#endregion
+
+
 ## Like [code]Log.pr()[/code], but also calls push_error() with the pretty string.
 static func error(msg: Variant, msg2: Variant = "ZZZDEF", msg3: Variant = "ZZZDEF", msg4: Variant = "ZZZDEF", msg5: Variant = "ZZZDEF", msg6: Variant = "ZZZDEF", msg7: Variant = "ZZZDEF") -> void:
 	var msgs: Array = [msg, msg2, msg3, msg4, msg5, msg6, msg7]
@@ -774,9 +786,6 @@ static func error(msg: Variant, msg2: Variant = "ZZZDEF", msg3: Variant = "ZZZDE
 	# skip the 'color' features in errors to keep them readable in the debugger
 	var m: String = Log.to_printable(msgs, {stack=get_stack(), disable_colors=true})
 	push_error(m)
-
-static func blank() -> void:
-	print()
 
 
 ## Helper that will both print() and print_rich() the enriched string
