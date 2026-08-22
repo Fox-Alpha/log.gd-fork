@@ -132,7 +132,6 @@ static func setup_settings(opts: Dictionary = {}) -> void:
 
 # config setup ####################################
 
-static var config: Dictionary = {}
 static func rebuild_config(opts: Dictionary = {}) -> void:
 	for key: String in CONFIG_DEFAULTS.keys():
 		# Keep config set in code before to_printable() is called for the first time
